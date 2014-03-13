@@ -23,6 +23,14 @@ To install this module type the following:
    make test
    make install
 
+To initialise tarantool box:
+   cp share/tarantool.cfg TARANTOOL_DIR
+   cp share/init.lua TARANTOOL_DIR
+   Edit tarantool.cfg for set number of space.
+   Run:
+     tarantool_box -c tarantool.cfg --init-storage
+     tarantool_box -c tarantool.cfg -B
+
 DEPENDENCIES
 
 This module requires these other modules and libraries:
