@@ -1,0 +1,51 @@
+AnyEvent-Net-SafeBrowsing2 version 0.75
+=====================================
+
+AnyEvent::Net::SafeBrowsing2 implements the Safe Browsing v2 API.
+
+The library passes most of the unit tests listed in the API documentation. 
+See the documentation (http://code.google.com/apis/safebrowsing/developers_guide_v2.html) for more details about the failed tests.
+
+The Safe Browsing database must be stored and managed locally.
+AnyEvent::Net::SafeBrowsing2::Tarantool uses Tarantool as the storage back-end.
+Other storage mechanisms (databases, memory, etc.) can be added and used transparently with this module.
+
+You may want to look at "Google Safe Browsing v2: Implementation Notes" (http://www.zscaler.com/research/Google%20Safe%20Browsing%20v2%20API.pdf), a collection of notes and real-world numbers about the API. This is intended for people who want to learn more about the API, whether as a user or to make their own implementation.
+
+The source code is available on github at https://github.com/Nikolo/AnyEvent-Net-SafeBrowsing2.git.
+
+INSTALLATION
+
+To install this module type the following:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+DEPENDENCIES
+
+This module requires these other modules and libraries:
+
+  AnyEvent::HTTP
+  AnyEvent::Tarantool
+  AnyEvent
+  Carp
+  Config::JSON
+  Data::Dumper
+  Digest::SHA
+  IO::Socket::SSL
+  List::Util
+  MIME::Base64
+  Mouse
+  URI
+
+COPYRIGHT AND LICENCE
+
+Copyright (C) 2014 by Nikolay Shulyakovskiy
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.10.1 or,
+at your option, any later version of Perl 5 you may have available.
+
+
