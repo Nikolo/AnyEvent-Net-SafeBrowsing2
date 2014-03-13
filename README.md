@@ -1,2 +1,0 @@
-AnyEvent-Net-SafeBrowsing2
-==========================
