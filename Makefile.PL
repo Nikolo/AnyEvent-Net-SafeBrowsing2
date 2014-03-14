@@ -12,7 +12,6 @@ WriteMakefile(
 		AnyEvent::Tarantool => 0,
 		AnyEvent => 0,
 		Carp => 0,
-		Config::JSON => 0,
 		Data::Dumper => 0,
 		Digest::SHA => 0,
 		IO::Socket::SSL => 0,

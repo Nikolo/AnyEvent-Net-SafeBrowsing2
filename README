@@ -1,4 +1,4 @@
-AnyEvent-Net-SafeBrowsing2 version 0.75
+AnyEvent-Net-SafeBrowsing2 version 0.82
 =====================================
 
 AnyEvent::Net::SafeBrowsing2 implements the Safe Browsing v2 API.
@@ -39,7 +39,6 @@ This module requires these other modules and libraries:
   AnyEvent::Tarantool
   AnyEvent
   Carp
-  Config::JSON
   Data::Dumper
   Digest::SHA
   IO::Socket::SSL
