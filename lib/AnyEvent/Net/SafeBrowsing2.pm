@@ -16,7 +16,7 @@ use AnyEvent::Net::SafeBrowsing2::Utils;
 use Mouse;
 use AnyEvent::HTTP;
 
-our $VERSION = '0.84';
+our $VERSION = '0.85';
 
 =head1 NAME
 
@@ -124,7 +124,7 @@ Optional. Object for log writing. Default AnyEvent::Net::SafeBrowsing2::Log
 
 =item data
 
-Optional. Object which handle the storage for the additioanl params. Default AnyEvent::New::SafeBrowsing2::Data
+Optional. Object which handle the storage for the additioanl params. Default AnyEvent::Net::SafeBrowsing2::Data
 
 =item data_filepath
 
@@ -403,7 +403,7 @@ sub BUILD {
 	if( $self->data && $self->data_filepath ){
 		die "Available only one parameter data or data_filepath";
 	}
-	$self->data( AnyEvent::New::SafeBrowsing2::Data->new( path => $self->data_filepath ));
+	$self->data( AnyEvent::Net::SafeBrowsing2::Data->new( path => $self->data_filepath ));
 	return $self;
 }
 

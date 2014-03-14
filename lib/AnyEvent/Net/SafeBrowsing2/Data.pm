@@ -52,7 +52,7 @@ Required. Path to file
 =cut
 
 has path   => (is => 'ro', isa => 'Str', required => 1);
-has config => (is => 'ro', isa =>'Hash', default => sub {return {updated => {}, mac_keys => {client_key => '', wrapped_key => ''}, full_hash_errors => {}}});
+has config => (is => 'rw', isa => 'HashRef', default => sub {return {updated => {}, mac_keys => {client_key => '', wrapped_key => ''}, full_hash_errors => {}}});
 
 sub BUILD {
 	my $self = shift;
@@ -86,9 +86,9 @@ sub get {
 sub set {
 	my $self = shift;
 	my $prop = shift;
-	my $val = shift;
+	my $value = shift;
 	if( $prop =~ m{^(.*)/([^/]*)$} ){
-		$self->get($1)->{$2} = $vaue;
+		$self->get($1)->{$2} = $value;
 	}
 	else {
 		$self->config->{$prop} = $value;
@@ -97,6 +97,21 @@ sub set {
 	return $prop;
 }
 
+sub delete {
+	my $self = shift;
+	my $prop = shift;
+	my $value = shift;
+	if( $prop =~ m{^(.*)/([^/]*)$} ){
+		delete $self->get($1)->{$2};
+	}
+	else {
+		delete $self->config->{$prop};
+	}
+	YAML::DumpFile($self->path, $self->config);
+	return $prop;
+
+}
+
 no Mouse;
-__PACKAGE->meta->make_imutable();
+__PACKAGE__->meta->make_immutable();
 

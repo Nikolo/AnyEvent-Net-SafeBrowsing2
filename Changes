@@ -1,7 +1,8 @@
 Revision history for Perl extension AnyEvent::Net::SafeBrowsing2.
 
-0.84 Fix use AnyEvent::Tarantool::Cluster
+0.85 Fix use AnyEvent::Tarantool::Cluster
      Add man files
+	 Any fixes
 
 0.82 Drop Config::JSON but Any::Moose is deprecated
 
