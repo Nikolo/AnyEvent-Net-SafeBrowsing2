@@ -4,6 +4,9 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME              => 'AnyEvent::Net::SafeBrowsing2',
     VERSION_FROM      => 'lib/AnyEvent/Net/SafeBrowsing2.pm', # finds $VERSION
+	MAN3PODS          => {
+		
+	},
     PREREQ_PM         => {
 		AnyEvent::HTTP => 0,
 		AnyEvent::Tarantool => 0,

@@ -14,7 +14,6 @@ use AnyEvent::Net::SafeBrowsing2::Storage;
 use AnyEvent::Net::SafeBrowsing2::Utils;
 use Mouse;
 use AnyEvent::HTTP;
-use Config::JSON;
 
 our $VERSION = '0.75';
 
@@ -124,7 +123,11 @@ Optional. Object for log writing. Default AnyEvent::Net::SafeBrowsing2::Log
 
 =item data
 
-Optional. Object which handle the storage for the additioanl params. Default Config::JSON
+Optional. Object which handle the storage for the additioanl params. Default AnyEvent::New::SafeBrowsing2::Data
+
+=item data_filepath
+
+Optional. Path to data file 
 
 =item http_timeout 
 
@@ -153,7 +156,8 @@ has version      => (is => 'rw', isa => 'Str', default => '2.2' );
 has mac          => (is => 'rw', isa => 'Bool', default => 0 );
 has log          => (is => 'rw', isa => 'Object', default => sub {AnyEvent::Net::SafeBrowsing2::Log->new({debug_level => 'info'})});
 has storage      => (is => 'rw', isa => 'Object', default => sub {AnyEvent::Net::SafeBrowsing2::Storage->new()});
-has data         => (is => 'rw', isa => 'Object', default => sub{ -f '/tmp/safebrowsing_data' ? Config::JSON->new('/tmp/safebrowsing_data') : Config::JSON->create('/tmp/safebrowsing_data')});
+has data         => (is => 'rw', isa => 'Object');
+has data_filepath=> (is => 'rw', isa => 'Str', default => '/tmp/safebrowsing_data' );
 has in_update    => (is => 'rw', isa => 'Int');
 has force        => (is => 'rw', isa => 'Bool', default => '0');
 has http_timeout => (is => 'ro', isa => 'Int', default => '60');
@@ -395,6 +399,10 @@ Constructor
 sub BUILD {
 	my $self = shift;
 	$self->storage->logger($self->log);
+	if( $self->data && $self->data_filepath ){
+		die "Available only one parameter data or data_filepath";
+	}
+	$self->data( AnyEvent::New::SafeBrowsing2::Data->new( path => $self->data_filepath ));
 	return $self;
 }
 

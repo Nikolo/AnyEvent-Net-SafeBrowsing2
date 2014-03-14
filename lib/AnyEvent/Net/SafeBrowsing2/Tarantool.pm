@@ -3,7 +3,7 @@ package AnyEvent::Net::SafeBrowsing2::Tarantool;
 use utf8;
 use strict;
 use Mouse;
-use AnyEvent::Tarantool::Cluster;
+use AnyEvent::Tarantool;
 
 extends 'AnyEvent::Net::SafeBrowsing2::Storage';
 
@@ -75,12 +75,6 @@ Required. Number of space for full hashes
 =item connected_cb
 
 Required. Callback CodeRef
-
-=back
-
-=item idled
-
-Idled requests
 
 =back
 
