@@ -5,7 +5,8 @@ WriteMakefile(
     NAME              => 'AnyEvent::Net::SafeBrowsing2',
     VERSION_FROM      => 'lib/AnyEvent/Net/SafeBrowsing2.pm', # finds $VERSION
 	MAN3PODS          => {
-		
+		'lib/AnyEvent/Net/SafeBrowsing2.pm'           => 'blib/man3/AnyEvent::Net::SafeBrowsing2.3',
+		'lib/AnyEvent/Net/SafeBrowsing2/Tarantool.pm' => 'blib/man3/AnyEvent::Net::SafeBrowsing2::Tarantool.3',
 	},
     PREREQ_PM         => {
 		AnyEvent::HTTP => 0,

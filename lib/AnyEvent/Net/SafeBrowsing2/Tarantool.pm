@@ -4,6 +4,7 @@ use utf8;
 use strict;
 use Mouse;
 use AnyEvent::Tarantool;
+use AnyEvent::Tarantool::Cluster;
 
 extends 'AnyEvent::Net::SafeBrowsing2::Storage';
 
