@@ -10,12 +10,13 @@ use List::Util qw(first);
 use MIME::Base64;
 use IO::Socket::SSL;
 use AnyEvent::Net::SafeBrowsing2::Log;
+use AnyEvent::Net::SafeBrowsing2::Data;
 use AnyEvent::Net::SafeBrowsing2::Storage;
 use AnyEvent::Net::SafeBrowsing2::Utils;
 use Mouse;
 use AnyEvent::HTTP;
 
-our $VERSION = '0.83';
+our $VERSION = '0.84';
 
 =head1 NAME
 
