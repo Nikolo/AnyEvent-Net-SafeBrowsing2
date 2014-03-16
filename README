@@ -1,4 +1,4 @@
-AnyEvent-Net-SafeBrowsing2 version 0.97
+AnyEvent-Net-SafeBrowsing2 version 0.98
 =====================================
 
 AnyEvent::Net::SafeBrowsing2 implements the Safe Browsing v2 API.

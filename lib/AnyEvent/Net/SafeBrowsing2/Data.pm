@@ -88,7 +88,12 @@ sub set {
 	my $prop = shift;
 	my $value = shift;
 	if( $prop =~ m{^(.*)/([^/]*)$} ){
-		$self->get($1)->{$2} = $value;
+		if( ref $self->get($1) eq 'HASH'){
+			$self->get($1)->{$2} = $value;
+		}
+		else {
+			$self->set($1, {$2 => $value});
+		}
 	}
 	else {
 		$self->config->{$prop} = $value;

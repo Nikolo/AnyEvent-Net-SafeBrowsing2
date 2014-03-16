@@ -16,7 +16,7 @@ use AnyEvent::Net::SafeBrowsing2::Utils;
 use Mouse;
 use AnyEvent::HTTP;
 
-our $VERSION = '0.97';
+our $VERSION = '0.98';
 
 =head1 NAME
 
@@ -573,54 +573,6 @@ sub process_update_data {
 	else {
 		$cb->($wait);
 	}
-
-
-
-=rem
-	my $process_count = -1;
-	my $watcher = sub {
-		my $error = shift;
-		$process_count++;
-		$have_error ||= $error;
-		log_debug2("Watcher count: ".$process_count." <==> ".scalar( @redirections ));
-		if( $process_count == scalar @redirections ){
-			if( $have_error ){
-				log_error("Have error while update data");
-				$self->update_error($list, $cb);
-			}
-			else {
-				$cb->($wait);
-			}	
-		}
-	};
-	$watcher->(); # For empty @redirections
-	
-	foreach my $data (@redirections) {
-		my $redirection = $data->[0];
-		$list = $data->[1];
-		my $hmac = $data->[2];
-		log_debug1("Url: https://$redirection");
-		http_get( "https://$redirection", %{$self->param_for_http_req}, sub {
-			my ($data, $headers) = @_; 
-			log_debug1("Checking redirection https://$redirection ($list)");
-			if( $headers->{Status} == 200 ){
-				#log_debug1(substr($data->as_string, 0, 250));
-				#log_debug1(substr($data->content, 0, 250));
-				if( $self->mac && !AnyEvent::Net::SafeBrowsing2::Utils->validate_data_mac(data => $data, key => $keys->{client_key}, digest => $hmac) ) {
-					log_error("MAC error on redirection");
-					log_debug1("Length of data: " . length($data));
-					$have_error = 1;
-				}
-				$self->parse_data(data => $data, list => $list, cb => $watcher);
-			}
-			else {
-				log_error("Request to $redirection failed ".$headers->{Status});
-				$watcher->( 1 );
-			}
-			return;
-		});
-	}
-=cut
 	return;
 }
 

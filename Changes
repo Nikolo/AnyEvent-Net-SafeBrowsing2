@@ -1,9 +1,10 @@
 Revision history for Perl extension AnyEvent::Net::SafeBrowsing2.
 
-0.97 Sun Mar 16 12:06:08 MSK 2014
+0.98 Sun Mar 16 12:06:08 MSK 2014
      AnyEvent::Net::SafeBrowsing2::Log change from object method to export sub
      Fix debug info
 	 AnyEvent::now -> AE::now
+	 Fix work with data file
 
 0.85 Fix use AnyEvent::Tarantool::Cluster
      Add man files
