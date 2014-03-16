@@ -9,13 +9,14 @@ use Digest::SHA qw(sha256);
 use List::Util qw(first);
 use MIME::Base64;
 use IO::Socket::SSL;
+use AnyEvent;
 use AnyEvent::Net::SafeBrowsing2::Data;
 use AnyEvent::Net::SafeBrowsing2::Storage;
 use AnyEvent::Net::SafeBrowsing2::Utils;
 use Mouse;
 use AnyEvent::HTTP;
 
-our $VERSION = '0.95';
+our $VERSION = '0.96';
 
 =head1 NAME
 
@@ -219,8 +220,8 @@ sub update {
 	foreach my $item ( @$list ){
 		my $info = $self->data->get('updated/'.$item);
 		log_info( "Update info: ", $info );
-		if(!$info || $info->{'time'} + $info->{'wait'} < AnyEvent::now() || $self->force ) {
-			log_info("OK to update $item: " . AnyEvent::now() . "/" . ($info ? $info->{'time'} +  $info->{'wait'} : 'first update'));
+		if(!$info || $info->{'time'} + $info->{'wait'} < AE::now() || $self->force ) {
+			log_info("OK to update $item: " . AE::now() . "/" . ($info ? $info->{'time'} +  $info->{'wait'} : 'first update'));
 			my $do_request = sub {
 				my($client_key, $wrapped_key) = @_;
 				if ($self->mac && (!$client_key || !$wrapped_key)) {
@@ -400,12 +401,10 @@ sub BUILD {
 	my $self = shift;
 	eval "use ".$self->log_class.";";
 	die $@ if $@;
-	#$self->storage->log_class($self->log_class);
 	if( $self->data && $self->data_filepath ){
 		die "Available only one parameter data or data_filepath";
 	}
 	$self->data( AnyEvent::Net::SafeBrowsing2::Data->new( path => $self->data_filepath ));
-	log_debug2("Test");
 	return $self;
 }
 
