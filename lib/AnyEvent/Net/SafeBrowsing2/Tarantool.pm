@@ -179,7 +179,7 @@ sub get_regions {
 	$self->dbh->master->lua( 'get_regions', [$self->a_chunks_space(), $self->s_chunks_space(), $list], {in => 'ppp', out => 'p'}, sub {
 		my ($data, $error) = @_;
 		if( $error ){
-			$self->logger->log_error( 'Tarantool error: '.$error );
+			log_error( 'Tarantool error: '.$error );
 			$cb->();
 		}
 		else {
@@ -206,7 +206,7 @@ sub delete_add_chunks {
 	foreach (@$chunknums){
 		$self->dbh->master->delete('a_chunks', [$list,$_], { index => 1 }, sub {
 			my ($result, $error) = @_;
-			$self->logger->log_error( "Tarantool error: ".$error ) if $error;
+			log_error( "Tarantool error: ".$error ) if $error;
 			$deleted++;
 			if( $deleted == @$chunknums ){
 				$cb->($error ? 1 : 0);
@@ -225,7 +225,7 @@ sub delete_sub_chunks {
 	foreach (@$chunknums){
 		$self->dbh->master->delete('s_chunks', [$list,$_], { index => 1 }, sub {
 			my ($result, $error) = @_;
-			$self->logger->log_error( "Tarantool error: ".$error ) if $error;
+			log_error( "Tarantool error: ".$error ) if $error;
 			$deleted++;
 			if( $deleted == @$chunknums ){
 				$cb->($error ? 1 : 0);
@@ -243,7 +243,7 @@ sub get_add_chunks {
 	$self->dbh->slave->select('a_chunks', [map [$_,$hostkey], @$list], {index => 2}, sub{
 		my ($result, $error) = @_;
 		if( $error || !$result->{count} ){
-			$self->logger->log_error( "Tarantool error: ".$error ) if $error;
+			log_error( "Tarantool error: ".$error ) if $error;
 			$cb->([]);
 		}
 		else {
@@ -266,7 +266,7 @@ sub get_sub_chunks {
 	$self->dbh->slave->select('s_chunks', [map [$_,$hostkey], @$list], {index => 2}, sub{
 		my ($result, $error) = @_;
 		if( $error || !$result->{count} ){
-			$self->logger->log_error( "Tarantool error: ".$error ) if $error;
+			log_error( "Tarantool error: ".$error ) if $error;
 			$cb->([]);
 		}
 		else {
@@ -290,7 +290,7 @@ sub delete_full_hashes {
 	foreach (@$chunknums){
 		$self->dbh->master->delete('full_hashes', [$list,$chunknums], {index => 1}, sub {
 			my ($result, $error) = @_;
-			$self->logger->log_error( "Tarantool error: ".$error ) if $error;
+			log_error( "Tarantool error: ".$error ) if $error;
 			$deleted++;
 			if( $deleted == @$chunknums ){
 				$cb->($error ? 1 : 0);
@@ -309,7 +309,7 @@ sub get_full_hashes {
 	$self->dbh->slave->select('full_hashes', [[$list,$chunknum]], {index => 1}, sub{
 		my ($result, $error) = @_;
 		if( $error || !$result->{count} ){
-			$self->logger->log_error( "Tarantool error: ".$error ) if $error;
+			log_error( "Tarantool error: ".$error ) if $error;
 			$cb->([]);
 		}
 		else {
@@ -319,7 +319,7 @@ sub get_full_hashes {
 				if( $tup->[$space->{fast}->{timestamp}->{no}] < $timestamp ){
 					$self->dbh->master->delete('full_hashes', [$tup->[0], $tup->[1], $tup->[2]], sub {
 						my ($result, $error) = @_;
-						$self->logger->log_error( "Tarantool error: ".$error ) if $error;
+						log_error( "Tarantool error: ".$error ) if $error;
 					});
 				}
 				else {
@@ -337,7 +337,7 @@ sub add_chunks_s {
 	ref $cb eq 'CODE' || die "cb arg is required and must be CODEREF";
 	$self->dbh->master->lua( 'add_chunks_s', [$self->s_chunks_space(),JSON::XS->new->encode($chunks)], {in => 'pp', out => 'p'}, sub {
 		my ($result, $error) = @_;
-		$self->logger->log_error( "Tarantool error: ",$error ) if $error;
+		log_error( "Tarantool error: ",$error ) if $error;
 		$cb->($error ? 1 : 0);
 	});
 }
@@ -347,7 +347,7 @@ sub add_chunks_a {
 	ref $cb eq 'CODE' || die "cb arg is required and must be CODEREF";
 	$self->dbh->master->lua( 'add_chunks_a', [$self->a_chunks_space(),JSON::XS->new->encode($chunks)], {in => 'pp', out => 'p'}, sub {
 		my ($result, $error) = @_;
-		$self->logger->log_error( "Tarantool error: ", $error ) if $error;
+		log_error( "Tarantool error: ", $error ) if $error;
 		$cb->($error ? 1 : 0);
 	});
 }
@@ -363,7 +363,7 @@ sub add_full_hashes {
 	foreach my $fhash (@$full_hashes) {
 		$self->dbh->master->insert('full_hashes', [$fhash->{list}, $fhash->{chunknum}, $fhash->{hash}, $timestamp], sub {
 			my ($result, $error) = @_;
-			$self->logger->log_error( "Tarantool error: ".$error ) if $error;
+			log_error( "Tarantool error: ".$error ) if $error;
 			$inserted++;
 			$err ||= $error;
 			if( $inserted == @$full_hashes ){
@@ -377,12 +377,6 @@ sub add_full_hashes {
 
 no Mouse;
 __PACKAGE__->meta->make_immutable();
-
-=head1 CHANGELOG
-
-=over 4
-
-=back
 
 =head1 SEE ALSO
 

@@ -52,14 +52,21 @@ Optional. Slave address database server host:port
 
 =item log
 
-Required. Object for log writing. Default AnyEvent::Net::SafeBrowsing2::Log
+Required. Class for log writing. Default AnyEvent::Net::SafeBrowsing2::Log
 
 =cut
+
+sub BUILD {
+	my $self = shift;
+	eval "use ".$self->log_class.";";
+	die $@ if $@;
+	return;
+}
 
 has master_server => ( is => 'rw', isa => 'Str' );
 has slave_server  => ( is => 'rw', isa => 'Str' );
 has dbh           => ( is => 'rw', isa => 'Object' );
-has logger        => ( is => 'rw', isa => 'Object' );
+has log_class     => ( is => 'rw', isa => 'Str', default => 'AnyEvent::Net::SafeBrowsing2::Log' );
 
 =head1 PUBLIC FUNCTIONS
 
@@ -315,12 +322,6 @@ sub add_chunks_a {die "unimplemented method called!"}
 
 no Mouse;
 __PACKAGE__->meta->make_immutable();
-
-=head1 CHANGELOG
-
-=over 4
-
-=back
 
 =head1 SEE ALSO
 

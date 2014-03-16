@@ -9,14 +9,13 @@ use Digest::SHA qw(sha256);
 use List::Util qw(first);
 use MIME::Base64;
 use IO::Socket::SSL;
-use AnyEvent::Net::SafeBrowsing2::Log;
 use AnyEvent::Net::SafeBrowsing2::Data;
 use AnyEvent::Net::SafeBrowsing2::Storage;
 use AnyEvent::Net::SafeBrowsing2::Utils;
 use Mouse;
 use AnyEvent::HTTP;
 
-our $VERSION = '0.85';
+our $VERSION = '0.95';
 
 =head1 NAME
 
@@ -155,7 +154,7 @@ has mac_server   => (is => 'rw', isa => 'Str' );
 has key          => (is => 'rw', isa => 'Str', required => 1 );
 has version      => (is => 'rw', isa => 'Str', default => '2.2' );
 has mac          => (is => 'rw', isa => 'Bool', default => 0 );
-has log          => (is => 'rw', isa => 'Object', default => sub {AnyEvent::Net::SafeBrowsing2::Log->new({debug_level => 'info'})});
+has log_class    => (is => 'rw', isa => 'Str', default => 'AnyEvent::Net::SafeBrowsing2::Log' );
 has storage      => (is => 'rw', isa => 'Object', default => sub {AnyEvent::Net::SafeBrowsing2::Storage->new()});
 has data         => (is => 'rw', isa => 'Object');
 has data_filepath=> (is => 'rw', isa => 'Str', default => '/tmp/safebrowsing_data' );
@@ -214,25 +213,25 @@ sub update {
 		my ($wait) = @_;
 		$mwait = $wait if !$mwait || $wait < $mwait;
 		$self->in_update( $self->in_update()-1 );
-		$self->log->log_debug2( "In update: ".$self->in_update() );
+		log_debug2( "In update: ".$self->in_update() );
 		$cb_ret->($mwait) unless $self->in_update();
 	};
 	foreach my $item ( @$list ){
 		my $info = $self->data->get('updated/'.$item);
-		$self->log->log_info( "Update info: ", $info );
+		log_info( "Update info: ", $info );
 		if(!$info || $info->{'time'} + $info->{'wait'} < AnyEvent::now() || $self->force ) {
-			$self->log->log_info("OK to update $item: " . AnyEvent::now() . "/" . ($info ? $info->{'time'} +  $info->{'wait'} : 'first update'));
+			log_info("OK to update $item: " . AnyEvent::now() . "/" . ($info ? $info->{'time'} +  $info->{'wait'} : 'first update'));
 			my $do_request = sub {
 				my($client_key, $wrapped_key) = @_;
 				if ($self->mac && (!$client_key || !$wrapped_key)) {
-					$self->log->log_error("MAC error ".$client_key.", ".$wrapped_key);
+					log_error("MAC error ".$client_key.", ".$wrapped_key);
 					$cb->($self->default_retry());
 				}
 				else {
 					$self->storage->get_regions(list => $item, cb => sub {
 						my($a_range, $s_range) = @_;
 						unless( defined $a_range ){
-							$self->log->log_error( 'Get range error' );
+							log_error( 'Get range error' );
 							$cb->($self->default_retry());
 							return;
 						}
@@ -249,13 +248,13 @@ sub update {
 						$body .= "\n";
 						my $url = $self->server."downloads?client=api&apikey=".$self->key."&appver=$VERSION&pver=".$self->version;
 						$url .= "&wrkey=$wrapped_key" if $self->mac;
-				 		$self->log->log_debug1( "Url: ".$url );
-				 		$self->log->log_debug1( "Body: ".$body );
+				 		log_debug1( "Url: ".$url );
+				 		log_debug1( "Body: ".$body );
 						http_post( $url, $body, %{$self->param_for_http_req}, sub {
 							my ($data, $headers) = @_; 
 							if( $headers->{Status} == 200 ){
 								if( $data ){
-									$self->log->log_debug3("Response body: ".$data);
+									log_debug3("Response body: ".$data);
 									$self->process_update_data( $data, {client_key => $client_key, wrapped_key => $wrapped_key}, $cb );
 								}
 								else {
@@ -263,7 +262,7 @@ sub update {
 								}
 							}
 							else {
-								$self->log->log_error("Bad response from server ".$headers->{Status} );
+								log_error("Bad response from server ".$headers->{Status} );
 								$self->update_error($item, $cb);
 							}
 							return;
@@ -282,7 +281,7 @@ sub update {
 			}
 		}
 		else {
-			$self->log->log_info("Too early to update $item");
+			log_info("Too early to update $item");
 			$cb->(int($info->{'time'} + $info->{'wait'}-AE::now()));
 		}
 	}
@@ -375,9 +374,9 @@ sub lookup {
 		}
 	};
 	foreach my $host (@hosts) {
-		$self->log->log_debug1("Domain for key: $domain => $host");
+		log_debug1("Domain for key: $domain => $host");
 		my $suffix = $self->prefix("$host/"); # Don't forget trailing hash
-		$self->log->log_debug2("Host key: ".unpack( 'V', $suffix));
+		log_debug2("Host key: ".unpack( 'V', $suffix));
 		$self->lookup_suffix(lists => $list, url => $url, suffix => unpack( 'V', $suffix ), cb => $watcher);
 	}
 	return;
@@ -399,11 +398,14 @@ Constructor
 
 sub BUILD {
 	my $self = shift;
-	$self->storage->logger($self->log);
+	eval "use ".$self->log_class.";";
+	die $@ if $@;
+	#$self->storage->log_class($self->log_class);
 	if( $self->data && $self->data_filepath ){
 		die "Available only one parameter data or data_filepath";
 	}
 	$self->data( AnyEvent::Net::SafeBrowsing2::Data->new( path => $self->data_filepath ));
+	log_debug2("Test");
 	return $self;
 }
 
@@ -438,86 +440,86 @@ sub process_update_data {
 
 	foreach my $line (@lines) {
 		if ($line =~ /n:\s*(\d+)\s*$/) {
-			$self->log->log_info("Next poll: $1 seconds");
+			log_info("Next poll: $1 seconds");
 			$wait = $1;
 			$self->data->set( 'updated/'.$list, {'time' => AE::now(), 'wait' => $wait} ) if $list;
 		}
 		elsif ($line =~ /i:\s*(\S+)\s*$/) {
-			$self->log->log_debug1("List: $1");
+			log_debug1("List: $1");
 			$list = $1;
 			$self->data->set( 'updated/'.$list, {'time' => AE::now(), 'wait' => $wait} ) if $wait;
 		}
 		elsif ($line =~ /m:(\S+)$/ && $self->mac) {
 			my $hmac = $1;
-			$self->log->log_debug3("MAC of request: $hmac");
+			log_debug3("MAC of request: $hmac");
 
 			# Remove this line for data
 			$data =~ s/^m:(\S+)//g;
 
 			if (!AnyEvent::Net::SafeBrowsing2::Utils->validate_data_mac(data => $data, key => $keys->{client_key}, digest => $hmac, logger => $self->log) ) {
-				$self->log->log_error("MAC error on main request");
+				log_error("MAC error on main request");
 				@redirections = ();
 				last;
 			}
 		}
 		elsif ($line =~ /u:\s*(\S+),(\S+)\s*$/) {
 			unless( $list ){
-				$self->log->log_error("Unknown list. Skip.");
+				log_error("Unknown list. Skip.");
 				next;
 			}
-			$self->log->log_debug1("Redirection: $1");
-			$self->log->log_debug3("MAC: $2");
+			log_debug1("Redirection: $1");
+			log_debug3("MAC: $2");
 			push(@redirections, [$1, $list, $2]);
 		}
 		elsif ($line =~ /u:\s*(\S+)\s*$/) {
 			unless( $list ){
-				$self->log->log_error("Unknown list. Skip.");
+				log_error("Unknown list. Skip.");
 				next;
 			}
-			$self->log->log_debug1("Redirection: $1");
+			log_debug1("Redirection: $1");
 			push(@redirections, [$1, $list, '']);
 		}
 		elsif ($line =~ /ad:(\S+)$/) {
 			unless( $list ){
-				$self->log->log_error("Unknown list. Skip.");
+				log_error("Unknown list. Skip.");
 				next;
 			}
-			$self->log->log_debug1("Delete Add Chunks: $1");
+			log_debug1("Delete Add Chunks: $1");
 
 			$add_range_info = $1 . " $list";
 			my $nums = AnyEvent::Net::SafeBrowsing2::Utils->expand_range($1);
 			if( @$nums ){
-				$self->storage->delete_add_chunks(chunknums => $nums, list => $list, cb => sub {$self->log->log_debug2(@_)});
+				$self->storage->delete_add_chunks(chunknums => $nums, list => $list, cb => sub {log_debug2(@_)});
 				# Delete full hash as well
-				$self->storage->delete_full_hashes(chunknums => $nums, list => $list, cb => sub {$self->log->log_debug2(@_)}) ;
+				$self->storage->delete_full_hashes(chunknums => $nums, list => $list, cb => sub {log_debug2(@_)}) ;
 			}
 		}
 		elsif ($line =~ /sd:(\S+)$/) {
 			unless( $list ){
-				$self->log->log_error("Unknown list. Skip.");
+				log_error("Unknown list. Skip.");
 				next;
 			}
-			$self->log->log_debug1("Delete Sub Chunks: $1");
+			log_debug1("Delete Sub Chunks: $1");
 
 			my $nums = AnyEvent::Net::SafeBrowsing2::Utils->expand_range($1);
 			$self->storage->delete_sub_chunks(chunknums => $nums, list => $list, cb => sub {}) if @$nums;
 		}
 		elsif ($line =~ /e:pleaserekey/ && $keys->{client_key}) {
 			unless( $list ){
-				$self->log->log_error("Unknown list. Skip.");
+				log_error("Unknown list. Skip.");
 				next;
 			}
-			$self->log->log_info("MAC key has been expired");
+			log_info("MAC key has been expired");
 			$self->delete_mac_keys();
 			$wait = 10;
 			last;
 		}
 		elsif ($line =~ /r:pleasereset/) {
 			unless( $list ){
-				$self->log->log_error("Unknown list. Skip.");
+				log_error("Unknown list. Skip.");
 				next;
 			}
-			$self->log->log_info("Database must be reset");
+			log_info("Database must be reset");
 
 			$self->storage->reset($list);
 			@redirections = ();
@@ -533,20 +535,20 @@ sub process_update_data {
 		my $redirection = $data->[0];
 		$list = $data->[1];
 		my $hmac = $data->[2];
-		$self->log->log_debug1("Url: https://$redirection");
+		log_debug1("Url: https://$redirection");
 		http_get( "https://$redirection", %{$self->param_for_http_req}, sub {
 			my ($data, $headers) = @_; 
-			$self->log->log_debug1("Checking redirection https://$redirection ($list)");
+			log_debug1("Checking redirection https://$redirection ($list)");
 			if( $headers->{Status} == 200 ){
 				if( $self->mac && !AnyEvent::Net::SafeBrowsing2::Utils->validate_data_mac(data => $data, key => $keys->{client_key}, digest => $hmac) ) {
-					$self->log->log_error("MAC error on redirection");
-					$self->log->log_debug1("Length of data: " . length($data));
+					log_error("MAC error on redirection");
+					log_debug1("Length of data: " . length($data));
 					$have_error = 1;
 				}
 				$self->parse_data(data => $data, list => $list, cb => sub {
 					my $error = shift;
 					if( $error ){
-						$self->log->log_error("Have error while update data");
+						log_error("Have error while update data");
 						$self->update_error($list, $cb);
 					}
 					else {
@@ -560,7 +562,7 @@ sub process_update_data {
 				});
 			}
 			else {
-				$self->log->log_error("Request to $redirection failed ".$headers->{Status});
+				log_error("Request to $redirection failed ".$headers->{Status});
 				$self->update_error($list, $cb);
 			}
 			return;
@@ -581,10 +583,10 @@ sub process_update_data {
 		my $error = shift;
 		$process_count++;
 		$have_error ||= $error;
-		$self->log->log_debug2("Watcher count: ".$process_count." <==> ".scalar( @redirections ));
+		log_debug2("Watcher count: ".$process_count." <==> ".scalar( @redirections ));
 		if( $process_count == scalar @redirections ){
 			if( $have_error ){
-				$self->log->log_error("Have error while update data");
+				log_error("Have error while update data");
 				$self->update_error($list, $cb);
 			}
 			else {
@@ -598,22 +600,22 @@ sub process_update_data {
 		my $redirection = $data->[0];
 		$list = $data->[1];
 		my $hmac = $data->[2];
-		$self->log->log_debug1("Url: https://$redirection");
+		log_debug1("Url: https://$redirection");
 		http_get( "https://$redirection", %{$self->param_for_http_req}, sub {
 			my ($data, $headers) = @_; 
-			$self->log->log_debug1("Checking redirection https://$redirection ($list)");
+			log_debug1("Checking redirection https://$redirection ($list)");
 			if( $headers->{Status} == 200 ){
-				#$self->log->log_debug1(substr($data->as_string, 0, 250));
-				#$self->log->log_debug1(substr($data->content, 0, 250));
+				#log_debug1(substr($data->as_string, 0, 250));
+				#log_debug1(substr($data->content, 0, 250));
 				if( $self->mac && !AnyEvent::Net::SafeBrowsing2::Utils->validate_data_mac(data => $data, key => $keys->{client_key}, digest => $hmac) ) {
-					$self->log->log_error("MAC error on redirection");
-					$self->log->log_debug1("Length of data: " . length($data));
+					log_error("MAC error on redirection");
+					log_debug1("Length of data: " . length($data));
 					$have_error = 1;
 				}
 				$self->parse_data(data => $data, list => $list, cb => $watcher);
 			}
 			else {
-				$self->log->log_error("Request to $redirection failed ".$headers->{Status});
+				log_error("Request to $redirection failed ".$headers->{Status});
 				$watcher->( 1 );
 			}
 			return;
@@ -659,7 +661,7 @@ sub lookup_suffix {
 					$cb->($found);
 				}
 				else {
-					$self->log->log_debug2("No match");
+					log_debug2("No match");
 					$cb->();
 				}
 			}
@@ -670,13 +672,13 @@ sub lookup_suffix {
 			$self->storage->get_full_hashes( chunknum => $add_chunk->{chunknum}, timestamp => time() - $self->cache_time, list => $add_chunk->{list}, cb => sub {
 				my $hashes = shift;
 				if( @$hashes ){
-					$self->log->log_debug2("Full hashes already stored for chunk " . $add_chunk->{chunknum} . ": " . scalar @$hashes);
+					log_debug2("Full hashes already stored for chunk " . $add_chunk->{chunknum} . ": " . scalar @$hashes);
 					my $fnd = '';
-					$self->log->log_debug1( "Searched hashes: ", \@full_hashes );
+					log_debug1( "Searched hashes: ", \@full_hashes );
 					foreach my $full_hash (@full_hashes) {
 						foreach my $hash (@$hashes) {
 							if ($hash->{hash} eq $full_hash && defined first { $hash->{list} eq $_ } @$lists) {
-								$self->log->log_debug2("Full hash was found in storage: ", $hash);
+								log_debug2("Full hash was found in storage: ", $hash);
 								$fnd = $hash->{list};
 							}
 						}
@@ -688,7 +690,7 @@ sub lookup_suffix {
 					# TODO: make sure we don't keep asking for the same over and over
 					$self->request_full_hash(prefixes => [ map($_->{prefix} || $_->{hostkey}, @$add_chunks) ], cb => sub {
 						my $hashes = shift;
-						$self->log->log_debug1( "Full hashes: ", $hashes);
+						log_debug1( "Full hashes: ", $hashes);
 						$self->storage->add_full_hashes(full_hashes => $hashes, timestamp => time(), cb => sub {});
 						$processed = 0;
 						$found = '';
@@ -715,7 +717,7 @@ sub lookup_suffix {
 							my $list = first { $hash->{list} eq $_ } @$lists;
 
 							if (defined $hash && defined $list) {
-								$self->log->log_debug2("Match: $full_hash");
+								log_debug2("Match: $full_hash");
 								$watcher->($hash->{list});
 							}
 						}
@@ -771,7 +773,7 @@ sub local_lookup_suffix {
 					}
 				}
 				if ($found == 0) {
-					$self->log->debug2("No prefix found");
+					debug2("No prefix found");
 					splice(@$add_chunks, $i, 1);
 				}
 				else {
@@ -861,9 +863,9 @@ sub local_lookup {
 	my @hosts = $self->canonical_domain_suffixes($domain); # only top-3 in this case
 
 	foreach my $host (@hosts) {
-		$self->log->debug1("Domain for key: $domain => $host");
+		debug1("Domain for key: $domain => $host");
 		my $suffix = $self->prefix("$host/"); # Don't forget trailing hash
-		$self->log->debug1("Host key: $suffix");
+		debug1("Host key: $suffix");
 
 		my @matches = $self->local_lookup_suffix(lists => [@lists], url => $url, suffix => $suffix);
 		return $matches[0]->{list} . " " . $matches[0]->{chunknum}  if (scalar @matches > 0);
@@ -919,21 +921,21 @@ sub request_mac_keys {
 	my $client_key = '';
 	my $wrapped_key = '';
 	my $url = $self->mac_server."newkey?client=api&apikey=".$self->key."&appver=$VERSION&pver=".$self->version;
-	$self->log->debug1( "Url for get keys: ".$url );
+	debug1( "Url for get keys: ".$url );
 	http_get($url, %{$self->param_for_http_req}, sub {
 		my ($data, $headers) = @_; 
 		if( $headers->{Status} == 200 ){
 			if ($data =~ s/^clientkey:(\d+)://mi) {
 				my $length = $1;
-				$self->log->log_debug1("MAC client key length: $length");
+				log_debug1("MAC client key length: $length");
 				$client_key = substr($data, 0, $length, '');
-				$self->log->log_debug2("MAC client key: $client_key");
+				log_debug2("MAC client key: $client_key");
 				substr($data, 0, 1, ''); # remove 
 				if ($data =~ s/^wrappedkey:(\d+)://mi) {
 					$length = $1;
-					$self->log->log_debug1("MAC wrapped key length: $length");
+					log_debug1("MAC wrapped key length: $length");
 					$wrapped_key = substr($data, 0, $length, '');
-					$self->log->log_debug2("MAC wrapped key: $wrapped_key");
+					log_debug2("MAC wrapped key: $wrapped_key");
 					$cb->(decode_base64($client_key), $wrapped_key);
 				}
 				else {
@@ -942,7 +944,7 @@ sub request_mac_keys {
 			}
 		}
 		else {
-			$self->log->log_error("Key request failed: " . $headers->{Status});
+			log_error("Key request failed: " . $headers->{Status});
 			$cb->('', '');
 		}
 	});
@@ -1001,7 +1003,7 @@ sub parse_data {
 		my $err = shift;
 		$in_process--;
 		$have_error ||= $err;
-		$self->log->log_debug2("Watcher parse: ".length( $data )."; ".$in_process);
+		log_debug2("Watcher parse: ".length( $data )."; ".$in_process);
 		if(!length( $data ) && !$in_process){
 			$cb->($have_error);
 		}
@@ -1031,14 +1033,14 @@ sub parse_data {
 				#$self->storage->add_chunks_a(chunknum => $chunk_num, chunks => [@chunks], list => $list, cb => $watcher); # Must happen all at once => not 100% sure
 			}
 			else {
-				$self->log->log_error("Incorrect chunk type: $type, should be a: or s:");
+				log_error("Incorrect chunk type: $type, should be a: or s:");
 				$cb->(1);
 				return;
 			}
-			$self->log->log_debug1("$type$chunk_num:$hash_length:$chunk_length OK");
+			log_debug1("$type$chunk_num:$hash_length:$chunk_length OK");
 		}
 		else {
-			$self->log->log_error("could not parse header");
+			log_error("could not parse header");
 #			$watcher->(1);
 			$cb->(1);
 			return;
@@ -1050,7 +1052,7 @@ sub parse_data {
 		my $err = shift;
 		$in_process--;
 		$have_error ||= $err;
-		$self->log->log_debug2("Watcher parse: ".length( $data )."; ".$in_process);
+		log_debug2("Watcher parse: ".length( $data )."; ".$in_process);
 		if(!$in_process){
 			$cb->($have_error);
 		}
@@ -1083,21 +1085,21 @@ sub parse_s {
 			if ($count == 0) { # ADDCHUNKNUM only
 				my $add_chunknum = unpack 'N', substr($value, 0, 4, ''); #chunk num
 				push(@data, { host => $host, add_chunknum => $add_chunknum, prefix => '' });
-				$self->log->log_debug1("$host $add_chunknum");
+				log_debug1("$host $add_chunknum");
 			}
 			else { # ADDCHUNKNUM + PREFIX
 				for(my $i = 0; $i < $count; $i++) {
 					my $add_chunknum = unpack 'N', substr($value, 0, 4, ''); # DEC
 					my $prefix = unpack 'H*', substr($value, 0, $hash_length, '');
 					push(@data, { host => $host, add_chunknum => $add_chunknum, prefix =>  $prefix });
-					$self->log->log_debug1("$host $add_chunknum $prefix");
+					log_debug1("$host $add_chunknum $prefix");
 				}
 			}
 		}
 	}
 	else {
 		push(@data, { add_chunknum => 0, host => 0, prefix => '' });
-		$self->log->log_debug1("Empty packet");
+		log_debug1("Empty packet");
 	}
 	return @data;
 }
@@ -1124,18 +1126,18 @@ sub parse_a {
 				for(my $i = 0; $i < $count; $i++) {
 					my $prefix = unpack 'H*', substr($value, 0, $hash_length, '');
 					push(@data, { host => $host, prefix =>  $prefix });
-					$self->log->log_debug1($host." ".$prefix);
+					log_debug1($host." ".$prefix);
 				}
 			}
 			else {
 				push(@data, { host => $host, prefix =>  '' });
-				$self->log->log_debug1($host);
+				log_debug1($host);
 			}
 		}
 	}
 	else {
 		push(@data, { host => 0, prefix => '' });
-		$self->log->log_debug1("Empty packet");
+		log_debug1("Empty packet");
 	}
 	return @data;
 }
@@ -1384,24 +1386,24 @@ sub request_full_hash {
 	}
 
 	my $url = $self->server . "gethash?client=api&apikey=" . $self->key . "&appver=$VERSION&pver=" . $self->version;
-	$self->log->log_debug1( "Full hash url: ". $url);
+	log_debug1( "Full hash url: ". $url);
 
 	my $prefix_list = join('', @$prefixes);
 	my $header = "$size:" . scalar @$prefixes * $size;
 	my $body = $header."\n".$prefix_list;
-	$self->log->log_debug1( "Full hash data: ". $body);
+	log_debug1( "Full hash data: ". $body);
 	http_post( $url, $body, %{$self->param_for_http_req}, sub {
 		my ($data, $headers) = @_; 
 		if( $headers->{Status} == 200 && length $data){
-			$self->log->log_debug1("Full hash request OK");
-			$self->log->log_debug3("Response body: ".$data);
+			log_debug1("Full hash request OK");
+			log_debug3("Response body: ".$data);
 			$self->data->delete('full_hash_errors/'.unpack( 'H*', $_ )) for @$prefixes;
 			my @hashes = ();
 
 			# goog-malware-shavar:22428:32HEX
 			while (length $data > 0) {
 				if ($data !~ /^([a-z\-]+):(\d+):(\d+)/) {
-					$self->log->log_error("list not found");
+					log_error("list not found");
 					$cb->([]);
 					return;
 				}
@@ -1419,7 +1421,7 @@ sub request_full_hash {
 			$cb->(\@hashes);
 		}
 		else {
-			$self->log->log_error("Full hash request failed ".$headers->{Status} );
+			log_error("Full hash request failed ".$headers->{Status} );
 			foreach my $prefix (@$prefixes) {
 				my $errors = $self->data->get('full_hash_errors/'.unpack( 'H*', $prefix));
 				if (defined $errors && ( $errors->{errors} >=2 || $errors->{errors} == 1 && (time() - $errors->{timestamp}) > 5 * 60)) { # 5 minutes
@@ -1435,12 +1437,6 @@ sub request_full_hash {
 no Mouse;
 __PACKAGE__->meta->make_immutable();
  
-=head1 CHANGELOG
-
-=over 4
-
-=back
-
 =head1 SEE ALSO
 
 See L<AnyEvent::Net::SafeBrowsing2::Storage>, L<AnyEvent::Net::SafeBrowsing2::Tarantool> for information on storing and managing the Safe Browsing database.
