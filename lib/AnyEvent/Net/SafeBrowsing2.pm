@@ -16,7 +16,7 @@ use AnyEvent::Net::SafeBrowsing2::Utils;
 use Mouse;
 use AnyEvent::HTTP;
 
-our $VERSION = '0.98';
+our $VERSION = '1.01';
 
 =head1 NAME
 
@@ -362,6 +362,7 @@ sub lookup {
 	$url =~ s/^(https?:\/\/)\/+/$1/;
 
 	my $uri = URI->new($url)->canonical;
+	die "Bad url ".$url if $uri->_no_scheme_ok;
 	my $domain = $uri->host;
 	my @hosts = $self->canonical_domain_suffixes($domain); # only top-3 in this case
 	my $processed = 0;
@@ -724,7 +725,7 @@ sub local_lookup_suffix {
 					}
 				}
 				if ($found == 0) {
-					debug2("No prefix found");
+					log_debug2("No prefix found");
 					splice(@$add_chunks, $i, 1);
 				}
 				else {
