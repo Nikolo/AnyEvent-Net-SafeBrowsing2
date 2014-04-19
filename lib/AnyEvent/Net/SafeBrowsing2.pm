@@ -719,7 +719,7 @@ sub local_lookup_suffix {
 			if ($add_chunks->[$i]->{prefix} ne '') {
 				my $found = 0;
 				foreach my $hash_prefix (@full_hashes_prefix) {
-					if ( $add_chunks->[$i]->{prefix} eq $hash_prefix) {
+					if ( $add_chunks->[$i]->{prefix} eq unpack( 'H*', $hash_prefix)) {
 						$found = 1;
 						last;
 					}
@@ -1308,7 +1308,7 @@ sub request_full_hash {
 	my $prefixes		= $args{prefixes}; ref $prefixes eq 'ARRAY'	|| die "Arg prefixes is required and must be arrayref";
 	my $cb              = $args{cb}                                 || die "Args cb is required";
 	foreach( @$prefixes ){
-		$_ = pack( 'V', $_);
+		$_ = pack( 'H*', $_);
 	}
 	my $size			= length $prefixes->[0];
 # 	# Handle errors
