@@ -362,7 +362,7 @@ sub lookup {
 	$url =~ s/^(https?:\/\/)\/+/$1/;
 
 	my $uri = URI->new($url)->canonical;
-	die "Bad url ".$url if $uri->_no_scheme_ok;
+	die "Bad url ".$url if $uri->scheme !~ /^https?$/;
 	my $domain = $uri->host;
 	my @hosts = $self->canonical_domain_suffixes($domain); # only top-3 in this case
 	my $processed = 0;
