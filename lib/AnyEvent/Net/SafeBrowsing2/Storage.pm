@@ -56,13 +56,6 @@ Required. Class for log writing. Default AnyEvent::Net::SafeBrowsing2::Log
 
 =cut
 
-sub BUILD {
-	my $self = shift;
-	eval "use ".$self->log_class.";";
-	die $@ if $@;
-	return;
-}
-
 has master_server => ( is => 'rw', isa => 'Str' );
 has slave_server  => ( is => 'rw', isa => 'Str' );
 has dbh           => ( is => 'rw', isa => 'Object' );

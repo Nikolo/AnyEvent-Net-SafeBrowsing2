@@ -98,6 +98,8 @@ See L<AnyEvent::Net::SafeBrowsing2::Storage> for a complete list of public funct
 
 sub BUILD {
 	my $self = shift;
+	eval "use ".$self->log_class.";";
+	die $@ if $@;
 	my $servers = [];
 	die "master_server is required" unless $self->master_server;
 	foreach( split ',', $self->master_server ){
@@ -202,17 +204,11 @@ sub delete_add_chunks {
 	my $chunknums     = $args{chunknums}                         || die "chunknums arg is required";
 	my $list          = $args{'list'}                            || die "list arg is required";
 	my $cb            = $args{'cb'};   ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
-	my $deleted = 0;
-	foreach (@$chunknums){
-		$self->dbh->master->delete('a_chunks', [$list,$_], { index => 1 }, sub {
-			my ($result, $error) = @_;
-			log_error( "Tarantool error: ".$error ) if $error;
-			$deleted++;
-			if( $deleted == @$chunknums ){
-				$cb->($error ? 1 : 0);
-			}
-		});
-	}
+	$self->dbh->master->lua( 'del_chunks_a', [$self->a_chunks_space(),JSON::XS->new->encode([map +{list => $list, chunknum => $_}, @$chunknums])], {in => 'pp', out => 'p'}, sub {
+		my ($result, $error) = @_;
+		log_error( "Tarantool error: ",$error ) if $error;
+		$cb->($error ? 1 : 0);
+	});
 	return;
 }
 
@@ -221,17 +217,11 @@ sub delete_sub_chunks {
 	my $chunknums     = $args{chunknums}                         || die "chunknums arg is required";
 	my $list          = $args{'list'}                            || die "list arg is required";
 	my $cb            = $args{'cb'};   ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
-	my $deleted = 0;
-	foreach (@$chunknums){
-		$self->dbh->master->delete('s_chunks', [$list,$_], { index => 1 }, sub {
-			my ($result, $error) = @_;
-			log_error( "Tarantool error: ".$error ) if $error;
-			$deleted++;
-			if( $deleted == @$chunknums ){
-				$cb->($error ? 1 : 0);
-			}
-		});
-	}
+	$self->dbh->master->lua( 'del_chunks_s', [$self->s_chunks_space(),JSON::XS->new->encode([map +{list => $list, chunknum => $_}, @$chunknums])], {in => 'pp', out => 'p'}, sub {
+		my ($result, $error) = @_;
+		log_error( "Tarantool error: ",$error ) if $error;
+		$cb->($error ? 1 : 0);
+	});
 	return;
 }
 
@@ -286,17 +276,11 @@ sub delete_full_hashes {
 	my $chunknums     = $args{chunknums}                         || die "chunknums arg is required";
 	my $list          = $args{'list'}                            || die "list arg is required";
 	my $cb            = $args{'cb'};   ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
-	my $deleted = 0;
-	foreach (@$chunknums){
-		$self->dbh->master->delete('full_hashes', [$list,$chunknums], {index => 1}, sub {
-			my ($result, $error) = @_;
-			log_error( "Tarantool error: ".$error ) if $error;
-			$deleted++;
-			if( $deleted == @$chunknums ){
-				$cb->($error ? 1 : 0);
-			}
-		});
-	}
+	$self->dbh->master->lua( 'del_full_hash', [$self->full_hashes_space(),JSON::XS->new->encode([map +{list => $list, chunknum => $_}, @$chunknums])], {in => 'pp', out => 'p'}, sub {
+		my ($result, $error) = @_;
+		log_error( "Tarantool error: ",$error ) if $error;
+		$cb->($error ? 1 : 0);
+	});
 	return;
 }
 
