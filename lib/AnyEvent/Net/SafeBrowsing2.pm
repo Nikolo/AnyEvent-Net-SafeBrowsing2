@@ -640,7 +640,7 @@ sub lookup_suffix {
 				else {
 					# ask for new hashes
 					# TODO: make sure we don't keep asking for the same over and over
-					$self->request_full_hash(prefixes => [ map($_->{prefix} || $_->{hostkey}, @$add_chunks) ], cb => sub {
+					$self->request_full_hash(prefixes => [ map(pack( 'H*', $_->{prefix}) || pack( 'L', $_->{hostkey}), @$add_chunks) ], cb => sub {
 						my $hashes = shift;
 						log_debug1( "Full hashes: ", $hashes);
 						$self->storage->add_full_hashes(full_hashes => $hashes, timestamp => time(), cb => sub {});
@@ -1307,9 +1307,6 @@ sub request_full_hash {
 	my ($self, %args) 	= @_;
 	my $prefixes		= $args{prefixes}; ref $prefixes eq 'ARRAY'	|| die "Arg prefixes is required and must be arrayref";
 	my $cb              = $args{cb}                                 || die "Args cb is required";
-	foreach( @$prefixes ){
-		$_ = pack( 'H*', $_);
-	}
 	my $size			= length $prefixes->[0];
 # 	# Handle errors
 	my $i = 0;
