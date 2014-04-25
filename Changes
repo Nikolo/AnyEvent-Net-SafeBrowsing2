@@ -1,6 +1,6 @@
 Revision history for Perl extension AnyEvent::Net::SafeBrowsing2.
 
-1.12 Sat Apr 19 17:12:48 MSK 2014
+1.13 Fri Apr 25 19:17:09 MSK 2014
      Fix work with full hashes
 
 1.10 Sat Apr 19 15:41:15 MSK 2014
