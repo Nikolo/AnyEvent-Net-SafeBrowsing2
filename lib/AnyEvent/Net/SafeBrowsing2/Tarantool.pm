@@ -107,7 +107,7 @@ sub BUILD {
 		($srv->{host}, $srv->{port}) = split ":", $_;
 		push @$servers, $srv;
 	}
-	foreach( split ',', $self->master_server ){
+	foreach( split ',', $self->slave_server ){
 		my $srv = {};
 		($srv->{host}, $srv->{port}) = split ":", $_;
 		push @$servers, $srv;

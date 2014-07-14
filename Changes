@@ -1,5 +1,8 @@
 Revision history for Perl extension AnyEvent::Net::SafeBrowsing2.
 
+1.14 Sat Jul 12 06:25:09 MSK 2014
+     Fix slave_server settings
+
 1.13 Fri Apr 25 19:17:09 MSK 2014
      Fix work with full hashes
 
