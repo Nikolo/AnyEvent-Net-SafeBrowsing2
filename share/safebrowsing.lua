@@ -1,3 +1,11 @@
+-- Version
+local VERSION               = "1.0"
+
+-- Modules
+safebrowsing = safebrowsing or {}
+local safebrowsing = safebrowsing
+module('safebrowsing', package.seeall)
+
 function get_regions(space_a, space_s, list)
 	local regions=""
 	local last_reg=0
@@ -113,4 +121,6 @@ function del_full_hash(space_num, json)
 	end
 	return ret
 end
+
+print(safebrowsing._NAME .. " version " .. VERSION .. " loaded")
 
