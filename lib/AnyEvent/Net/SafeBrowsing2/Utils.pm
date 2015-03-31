@@ -17,12 +17,11 @@ Explode list of ranges (1-3, 5, 7-11) into a list of numbers (1,2,3,5,7,8,9,10,1
 
 sub expand_range {
 	my ($self, $range) = @_;
-	my @list = ();
 	die "Bad range ".$range if $range !~ /^[\d\-\,\s]+$/;
 	$range =~ s/-/../g;
 	$range =~ s/\s+//g;
-	push(@list, eval $range);
-	return \@list;
+	my %list = map {$_ => 1} eval $range;
+	return [keys %list];
 }
 
 =head2 validate_data_mac()

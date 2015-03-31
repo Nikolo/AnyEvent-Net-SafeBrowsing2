@@ -16,7 +16,7 @@ use AnyEvent::Net::SafeBrowsing2::Utils;
 use Mouse;
 use AnyEvent::HTTP;
 
-our $VERSION = '2.06';
+our $VERSION = '2.07';
 
 =head1 NAME
 
@@ -489,9 +489,15 @@ sub process_update_data {
 			$add_range_info = $1 . " $list";
 			my $nums = AnyEvent::Net::SafeBrowsing2::Utils->expand_range($1);
 			if( @$nums ){
-				$self->storage->delete_add_chunks(chunknums => $nums, list => $list, cb => sub {log_debug2(@_)});
-				# Delete full hash as well
-				$self->storage->delete_full_hashes(chunknums => $nums, list => $list, cb => sub {log_debug2(@_)}) ;
+				my $iters = int(scalar(@$nums)/1000)+1;
+				for( my $i = 0; $i < $iters; $i++){
+					my $from = $i*1000;
+					my $to = 1000*($i+1)-1;
+					$to = scalar(@$nums)-1 if $to >= scalar(@$nums);
+					$self->storage->delete_add_chunks(chunknums => @$nums[$from..$to], list => $list, cb => sub {log_debug2(@_)});
+					# Delete full hash as well
+					$self->storage->delete_full_hashes(chunknums => @$nums[$from..$to], list => $list, cb => sub {log_debug2(@_)}) ;
+				}
 			}
 		}
 		elsif ($line =~ /sd:(\S+)$/) {
@@ -502,7 +508,15 @@ sub process_update_data {
 			log_debug1("Delete Sub Chunks: $1");
 
 			my $nums = AnyEvent::Net::SafeBrowsing2::Utils->expand_range($1);
-			$self->storage->delete_sub_chunks(chunknums => $nums, list => $list, cb => sub {}) if @$nums;
+			if( @$nums ){
+				my $iters = int(scalar(@$nums)/1000)+1;
+				for( my $i = 0; $i < $iters; $i++){
+					my $from = $i*1000;
+					my $to = 1000*($i+1)-1;
+					$to = scalar(@$nums)-1 if $to >= scalar(@$nums);
+					$self->storage->delete_sub_chunks(chunknums => @$nums[$from..$to], list => $list, cb => sub {log_debug2(@_)});
+				}
+			}
 		}
 		elsif ($line =~ /e:pleaserekey/ && $keys->{client_key}) {
 			unless( $list ){
