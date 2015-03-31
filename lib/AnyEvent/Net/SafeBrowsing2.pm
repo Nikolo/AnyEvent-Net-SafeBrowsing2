@@ -16,7 +16,7 @@ use AnyEvent::Net::SafeBrowsing2::Utils;
 use Mouse;
 use AnyEvent::HTTP;
 
-our $VERSION = '2.04';
+our $VERSION = '2.06';
 
 =head1 NAME
 
@@ -948,21 +948,19 @@ sub parse_data {
 
 	my $bulk_insert_a = [];
 	my $bulk_insert_s = [];
-=rem
-	my $in_process = 0;
+
+	my $in_process = 1;
 	my $have_error = 0;
 	my $watcher = sub {
 		my $err = shift;
 		$in_process--;
 		$have_error ||= $err;
 		log_debug2("Watcher parse: ".length( $data )."; ".$in_process);
-		if(!length( $data ) && !$in_process){
+		if(!$in_process){
 			$cb->($have_error);
 		}
 	};
-=cut
 	while (length $data > 0) {
-#		$in_process++;
 		my $type = substr($data, 0, 2, ''); # s:34321:4:137
 		if ($data  =~ /^(\d+):(\d+):(\d+)/sgi) {
 			$chunk_num = $1;
@@ -976,18 +974,26 @@ sub parse_data {
 				foreach ($self->parse_s(value => $encoded, hash_length => $hash_length)){
 					push @$bulk_insert_s, {chunknum => $chunk_num, chunk => $_, list => $list};
 				}
-				#$self->storage->add_chunks_s(chunknum => $chunk_num, chunks => [@chunks], list => $list, cb => $watcher); # Must happen all at once => not 100% sure
 			}
 			elsif ($type eq 'a:') {
 				foreach( $self->parse_a(value => $encoded, hash_length => $hash_length)){
 					push @$bulk_insert_a, {chunknum => $chunk_num, chunk => $_, list => $list}
 				}
-				#$self->storage->add_chunks_a(chunknum => $chunk_num, chunks => [@chunks], list => $list, cb => $watcher); # Must happen all at once => not 100% sure
 			}
 			else {
 				log_error("Incorrect chunk type: $type, should be a: or s:");
 				$cb->(1);
 				return;
+			}
+			if( @$bulk_insert_a > 1000 ){
+				++$in_process;
+				$self->storage->add_chunks_a($bulk_insert_a, $watcher);
+				$bulk_insert_a = [];
+			}
+			if( @$bulk_insert_s > 1000 ){
+				++$in_process;
+				$self->storage->add_chunks_s($bulk_insert_s, $watcher);
+				$bulk_insert_s = [];
 			}
 			log_debug1("$type$chunk_num:$hash_length:$chunk_length OK");
 		}
@@ -998,21 +1004,12 @@ sub parse_data {
 			return;
 		}
 	}
-	my $in_process = 0;
-	my $have_error = 0;
-	my $watcher = sub {
-		my $err = shift;
-		$in_process--;
-		$have_error ||= $err;
-		log_debug2("Watcher parse: ".length( $data )."; ".$in_process);
-		if(!$in_process){
-			$cb->($have_error);
-		}
-	};
+	$in_process--;
 	$in_process++ if @$bulk_insert_s;
 	$in_process++ if @$bulk_insert_a;
 	$self->storage->add_chunks_s($bulk_insert_s, $watcher) if @$bulk_insert_s;
 	$self->storage->add_chunks_a($bulk_insert_a, $watcher) if @$bulk_insert_a;
+	$cb->(0) unless @$bulk_insert_s || @$bulk_insert_a;
 	return ;
 }
 
