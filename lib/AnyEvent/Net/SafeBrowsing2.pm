@@ -16,7 +16,7 @@ use AnyEvent::Net::SafeBrowsing2::Utils;
 use Mouse;
 use AnyEvent::HTTP;
 
-our $VERSION = '2.07';
+our $VERSION = '2.08';
 
 =head1 NAME
 
@@ -494,9 +494,9 @@ sub process_update_data {
 					my $from = $i*1000;
 					my $to = 1000*($i+1)-1;
 					$to = scalar(@$nums)-1 if $to >= scalar(@$nums);
-					$self->storage->delete_add_chunks(chunknums => @$nums[$from..$to], list => $list, cb => sub {log_debug2(@_)});
+					$self->storage->delete_add_chunks(chunknums => [@$nums[$from..$to]], list => $list, cb => sub {log_debug2(@_)});
 					# Delete full hash as well
-					$self->storage->delete_full_hashes(chunknums => @$nums[$from..$to], list => $list, cb => sub {log_debug2(@_)}) ;
+					$self->storage->delete_full_hashes(chunknums => [@$nums[$from..$to]], list => $list, cb => sub {log_debug2(@_)}) ;
 				}
 			}
 		}
@@ -514,7 +514,7 @@ sub process_update_data {
 					my $from = $i*1000;
 					my $to = 1000*($i+1)-1;
 					$to = scalar(@$nums)-1 if $to >= scalar(@$nums);
-					$self->storage->delete_sub_chunks(chunknums => @$nums[$from..$to], list => $list, cb => sub {log_debug2(@_)});
+					$self->storage->delete_sub_chunks(chunknums => [@$nums[$from..$to]], list => $list, cb => sub {log_debug2(@_)});
 				}
 			}
 		}
