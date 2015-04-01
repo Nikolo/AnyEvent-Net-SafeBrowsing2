@@ -1,5 +1,5 @@
 -- Version
-local VERSION               = "1.0"
+local VERSION               = "2.0"
 
 -- Modules
 safebrowsing = safebrowsing or {}
@@ -91,7 +91,7 @@ function del_chunks_s(space_num, json)
 	local ret = 0
 	local to_del = {};
 	for k,rec in pairs(box.cjson.decode(json)) do
-		for v in box.space[space].index[1]:iterator(box.index.LE, rec.list, tonumber(rec.chunknum)) do 
+		for v in box.space[space].index[0]:iterator(box.index.LE, rec.list, tonumber(rec.chunknum)) do 
 			if not v or box.unpack('i',v[1]) ~= tonumber(rec.chunknum) then break end
 			table.insert(to_del, v)
 		end
@@ -108,7 +108,7 @@ function del_chunks_a(space_num, json)
 	local ret = 0
 	local to_del = {};
 	for k,rec in pairs(box.cjson.decode(json)) do
-		for v in box.space[space].index[1]:iterator(box.index.LE, rec.list, tonumber(rec.chunknum)) do 
+		for v in box.space[space].index[0]:iterator(box.index.LE, rec.list, tonumber(rec.chunknum)) do 
 			if not v or box.unpack('i',v[1]) ~= tonumber(rec.chunknum) then break end
 			table.insert(to_del, v)
 		end

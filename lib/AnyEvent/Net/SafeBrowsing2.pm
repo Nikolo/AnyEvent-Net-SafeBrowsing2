@@ -16,7 +16,7 @@ use AnyEvent::Net::SafeBrowsing2::Utils;
 use Mouse;
 use AnyEvent::HTTP;
 
-our $VERSION = '2.09';
+our $VERSION = '2.10';
 
 =head1 NAME
 

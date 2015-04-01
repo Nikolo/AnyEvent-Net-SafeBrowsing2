@@ -125,10 +125,6 @@ sub BUILD {
 						fields => ['list', 'chunknum', 'hostkey', 'prefix'],
 					},
 					1 => {
-						name => 'idx_a_list_num',
-						fields => ['list', 'chunknum'],
-					},
-					2 => {
 						name => 'idx_a_list_host',
 						fields => ['list', 'hostkey'],
 					},
@@ -144,10 +140,6 @@ sub BUILD {
 						fields => ['list', 'chunknum', 'hostkey', 'prefix'],
 					},
 					1 => {
-						name => 'idx_s_list_num',
-						fields => ['list', 'chunknum'],
-					},
-					2 => {
 						name => 'idx_s_list_host',
 						fields => ['list', 'hostkey'],
 					},
@@ -230,7 +222,7 @@ sub get_add_chunks {
 	my $hostkey       = $args{hostkey}                           || die "hostkey arg is required";
 	my $list          = $args{'lists'}                           || die "lists arg is required";
 	my $cb            = $args{'cb'};   ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
-	$self->dbh->slave->select('a_chunks', [map [$_,$hostkey], @$list], {index => 2}, sub{
+	$self->dbh->slave->select('a_chunks', [map [$_,$hostkey], @$list], {index => 1}, sub{
 		my ($result, $error) = @_;
 		if( $error || !$result->{count} ){
 			log_error( "Tarantool error: ".$error ) if $error;
@@ -253,7 +245,7 @@ sub get_sub_chunks {
 	my $hostkey       = $args{hostkey}                           || die "hostkey arg is required";
 	my $list          = $args{'lists'}                           || die "lists arg is required";
 	my $cb            = $args{'cb'};   ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
-	$self->dbh->slave->select('s_chunks', [map [$_,$hostkey], @$list], {index => 2}, sub{
+	$self->dbh->slave->select('s_chunks', [map [$_,$hostkey], @$list], {index => 1}, sub{
 		my ($result, $error) = @_;
 		if( $error || !$result->{count} ){
 			log_error( "Tarantool error: ".$error ) if $error;
