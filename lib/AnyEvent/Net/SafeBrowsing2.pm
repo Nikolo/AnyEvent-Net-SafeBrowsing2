@@ -658,6 +658,7 @@ sub lookup_suffix {
 					# TODO: make sure we don't keep asking for the same over and over
 					$self->request_full_hash(prefixes => [ map(pack( 'H*', $_->{prefix}) || pack( 'L', $_->{hostkey}), @$add_chunks) ], cb => sub {
 						my $hashes = shift;
+						$cb->() unless @$hashes;
 						log_debug1( "Full hashes: ", $hashes);
 						$self->storage->add_full_hashes(full_hashes => $hashes, timestamp => time(), cb => sub {});
 						$processed = 0;
@@ -1382,6 +1383,10 @@ sub request_full_hash {
 
 			$cb->(\@hashes);
 		}
+		elsif( $headers->{Status} == 204 && (length $data) == 0 ) {
+			log_debug1("Full hash request returned  204: No content");
+			$cb->([]);
+		}  
 		else {
 			log_error("Full hash request failed ".$headers->{Status} );
 			foreach my $prefix (@$prefixes) {
