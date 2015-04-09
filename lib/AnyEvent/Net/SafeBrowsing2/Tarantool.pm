@@ -84,6 +84,7 @@ Required. Callback CodeRef
 has a_chunks_space    => (is => 'rw', isa => 'Int', required => 1);
 has s_chunks_space    => (is => 'rw', isa => 'Int', required => 1);
 has full_hashes_space => (is => 'rw', isa => 'Int', required => 1);
+has timeout           => (is => 'ro', isa => 'Int', default  => 1);
 has all_connected     => (is => 'ro', isa => 'CodeRef', default => sub {return sub{}});
 
 =head1 PUBLIC FUNCTIONS
@@ -114,6 +115,7 @@ sub BUILD {
 	}
 	$self->dbh(AnyEvent::Tarantool::Cluster->new(
 		servers => $servers,
+		timeout => $self->timeout,
 		spaces => {
 			$self->a_chunks_space() => {
 				name         => 'a_chunks',
@@ -170,24 +172,29 @@ sub get_regions {
 	my ($self, %args) = @_;
 	my $list          = $args{list}                          || die "list arg is required";
 	my $cb            = $args{cb}; ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
-	$self->dbh->master->lua( 'safebrowsing.get_regions', [$self->a_chunks_space(), $self->s_chunks_space(), $list], {in => 'ppp', out => 'p'}, sub {
-		my ($data, $error) = @_;
-		if( $error ){
-			log_error( 'Tarantool error: '.$error );
-			$cb->();
-		}
-		else {
-			if( $data->{tuples}->[0]->[0] && $data->{tuples}->[0]->[0] ne ';' ){
-				my ($ret_a, $ret_s) = ('','');
-				($ret_a, $ret_s) = split(';', $data->{tuples}->[0]->[0]);
-				$cb->($ret_a, $ret_s);
+	if(!$self->dbh){
+
+	}
+	else {
+		$self->dbh->master->lua( 'safebrowsing.get_regions', [$self->a_chunks_space(), $self->s_chunks_space(), $list], {in => 'ppp', out => 'p'}, sub {
+			my ($data, $error) = @_;
+			if( $error ){
+				log_error( 'Tarantool error: '.$error );
+				$cb->();
 			}
 			else {
-				$cb->('','');
+				if( $data->{tuples}->[0]->[0] && $data->{tuples}->[0]->[0] ne ';' ){
+					my ($ret_a, $ret_s) = ('','');
+					($ret_a, $ret_s) = split(';', $data->{tuples}->[0]->[0]);
+					$cb->($ret_a, $ret_s);
+				}
+				else {
+					$cb->('','');
+				}
 			}
-		}
-		return;
-	});
+			return;
+		});
+	}
 	return;
 }
 
