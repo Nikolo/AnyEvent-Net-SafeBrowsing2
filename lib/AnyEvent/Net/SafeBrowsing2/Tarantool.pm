@@ -172,10 +172,7 @@ sub get_regions {
 	my ($self, %args) = @_;
 	my $list          = $args{list}                          || die "list arg is required";
 	my $cb            = $args{cb}; ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
-	if(!$self->dbh){
-
-	}
-	else {
+	if($self->dbh && $self->dbh->master){
 		$self->dbh->master->lua( 'safebrowsing.get_regions', [$self->a_chunks_space(), $self->s_chunks_space(), $list], {in => 'ppp', out => 'p'}, sub {
 			my ($data, $error) = @_;
 			if( $error ){
@@ -195,6 +192,10 @@ sub get_regions {
 			return;
 		});
 	}
+	else {
+		log_error( 'SafeBrowsing2 tarantool master-server is unavailable' );
+		$cb->();
+	}
 	return;
 }
 
@@ -203,11 +204,17 @@ sub delete_add_chunks {
 	my $chunknums     = $args{chunknums}                         || die "chunknums arg is required";
 	my $list          = $args{'list'}                            || die "list arg is required";
 	my $cb            = $args{'cb'};   ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
-	$self->dbh->master->lua( 'safebrowsing.del_chunks_a', [$self->a_chunks_space(),JSON::XS->new->encode([map +{list => $list, chunknum => $_}, @$chunknums])], {in => 'pp', out => 'p'}, sub {
-		my ($result, $error) = @_;
-		log_error( "Tarantool error: ",$error ) if $error;
-		$cb->($error ? 1 : 0);
-	});
+	if ($self->dbh && $self->dbh->master) {
+		$self->dbh->master->lua( 'safebrowsing.del_chunks_a', [$self->a_chunks_space(),JSON::XS->new->encode([map +{list => $list, chunknum => $_}, @$chunknums])], {in => 'pp', out => 'p'}, sub {
+			my ($result, $error) = @_;
+			log_error( "Tarantool error: ",$error ) if $error;
+			$cb->($error ? 1 : 0);
+		});
+	}
+	else {
+		log_error( 'SafeBrowsing2 tarantool master-server is unavailable' );
+		$cb->(1);
+	}
 	return;
 }
 
@@ -216,11 +223,17 @@ sub delete_sub_chunks {
 	my $chunknums     = $args{chunknums}                         || die "chunknums arg is required";
 	my $list          = $args{'list'}                            || die "list arg is required";
 	my $cb            = $args{'cb'};   ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
-	$self->dbh->master->lua( 'safebrowsing.del_chunks_s', [$self->s_chunks_space(),JSON::XS->new->encode([map +{list => $list, chunknum => $_}, @$chunknums])], {in => 'pp', out => 'p'}, sub {
-		my ($result, $error) = @_;
-		log_error( "Tarantool error: ",$error ) if $error;
-		$cb->($error ? 1 : 0);
-	});
+	if ($self->dbh && $self->dbh->master) {
+		$self->dbh->master->lua( 'safebrowsing.del_chunks_s', [$self->s_chunks_space(),JSON::XS->new->encode([map +{list => $list, chunknum => $_}, @$chunknums])], {in => 'pp', out => 'p'}, sub {
+			my ($result, $error) = @_;
+			log_error( "Tarantool error: ",$error ) if $error;
+			$cb->($error ? 1 : 0);
+		});
+	}
+	else {
+		log_error( 'SafeBrowsing2 tarantool master-server is unavailable' );
+		$cb->(1);
+	}
 	return;
 }
 
@@ -229,21 +242,33 @@ sub get_add_chunks {
 	my $hostkey       = $args{hostkey}                           || die "hostkey arg is required";
 	my $list          = $args{'lists'}                           || die "lists arg is required";
 	my $cb            = $args{'cb'};   ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
-	$self->dbh->slave->select('a_chunks', [map [$_,$hostkey], @$list], {index => 1}, sub{
-		my ($result, $error) = @_;
-		if( $error || !$result->{count} ){
-			log_error( "Tarantool error: ".$error ) if $error;
-			$cb->([]);
-		}
-		else {
-			my $space = $self->dbh->master->{spaces}->{a_chunks};
-			my $ret = [];
-			foreach my $tup ( @{$result->{tuples}} ){
-				push @$ret, {map {$_->{name} => $tup->[$_->{no}]||''} @{$space->{fields}}}
+	if ($self->dbh && $self->dbh->slave) {
+		$self->dbh->slave->select('a_chunks', [map [$_,$hostkey], @$list], {index => 1}, sub{
+			my ($result, $error) = @_;
+			if( $error || !$result->{count} ){
+				log_error( "Tarantool error: ".$error ) if $error;
+				$cb->([]);
 			}
-			$cb->($ret); 
-		}
-	});
+			else {
+				if ($self->dbh->master) {
+					my $space = $self->dbh->master->{spaces}->{a_chunks};
+					my $ret = [];
+					foreach my $tup ( @{$result->{tuples}} ){
+						push @$ret, {map {$_->{name} => $tup->[$_->{no}]||''} @{$space->{fields}}}
+					}
+					$cb->($ret); 
+				}
+				else {
+					log_error( 'SafeBrowsing2 tarantool master-server is unavailable' );
+					$cb->([]);
+				}
+			}
+		});
+	}
+	else {
+		log_error( 'SafeBrowsing2 tarantool slave-server is unavailable' );
+		$cb->([]);
+	}
 	return;
 }
 
@@ -252,21 +277,33 @@ sub get_sub_chunks {
 	my $hostkey       = $args{hostkey}                           || die "hostkey arg is required";
 	my $list          = $args{'lists'}                           || die "lists arg is required";
 	my $cb            = $args{'cb'};   ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
-	$self->dbh->slave->select('s_chunks', [map [$_,$hostkey], @$list], {index => 1}, sub{
-		my ($result, $error) = @_;
-		if( $error || !$result->{count} ){
-			log_error( "Tarantool error: ".$error ) if $error;
-			$cb->([]);
-		}
-		else {
-			my $space = $self->dbh->master->{spaces}->{s_chunks};
-			my $ret = [];
-			foreach my $tup ( @{$result->{tuples}} ){
-				push @$ret, {map {$_->{name} => $tup->[$_->{no}]||''} @{$space->{fields}}}
+	if ($self->dbh && $self->dbh->slave) {
+		$self->dbh->slave->select('s_chunks', [map [$_,$hostkey], @$list], {index => 1}, sub{
+			my ($result, $error) = @_;
+			if( $error || !$result->{count} ){
+				log_error( "Tarantool error: ".$error ) if $error;
+				$cb->([]);
 			}
-			$cb->($ret); 
-		}
-	});
+			else {
+				if ($self->dbh && $self->dbh->master) {
+					my $space = $self->dbh->master->{spaces}->{s_chunks};
+					my $ret = [];
+					foreach my $tup ( @{$result->{tuples}} ){
+						push @$ret, {map {$_->{name} => $tup->[$_->{no}]||''} @{$space->{fields}}}
+					}
+					$cb->($ret);
+				}
+				else {
+					log_error( 'SafeBrowsing2 tarantool master-server is unavailable' );
+					$cb->([]);
+				}
+			}
+		});
+	}
+	else {
+		log_error( 'SafeBrowsing2 tarantool slave-server is unavailable' );
+		$cb->([]);
+	}
 	return;
 }
 
@@ -275,11 +312,17 @@ sub delete_full_hashes {
 	my $chunknums     = $args{chunknums}                         || die "chunknums arg is required";
 	my $list          = $args{'list'}                            || die "list arg is required";
 	my $cb            = $args{'cb'};   ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
-	$self->dbh->master->lua( 'safebrowsing.del_full_hash', [$self->full_hashes_space(),JSON::XS->new->encode([map +{list => $list, chunknum => $_}, @$chunknums])], {in => 'pp', out => 'p'}, sub {
-		my ($result, $error) = @_;
-		log_error( "Tarantool error: ",$error ) if $error;
-		$cb->($error ? 1 : 0);
-	});
+	if ($self->dbh && $self->dbh->master) {
+		$self->dbh->master->lua( 'safebrowsing.del_full_hash', [$self->full_hashes_space(),JSON::XS->new->encode([map +{list => $list, chunknum => $_}, @$chunknums])], {in => 'pp', out => 'p'}, sub {
+			my ($result, $error) = @_;
+			log_error( "Tarantool error: ",$error ) if $error;
+			$cb->($error ? 1 : 0);
+		});
+	}
+	else {
+		log_error( 'SafeBrowsing2 tarantool master-server is unavailable' );
+		$cb->(1);
+	}
 	return;
 }
 
@@ -289,50 +332,77 @@ sub get_full_hashes {
 	my $list          = $args{'list'}                            || die "lists arg is required";
 	my $timestamp     = $args{'timestamp'}                       || die "timestamp arg is required";
 	my $cb            = $args{'cb'};   ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
-	$self->dbh->slave->select('full_hashes', [[$list,$chunknum]], {index => 1}, sub{
-		my ($result, $error) = @_;
-		if( $error || !$result->{count} ){
-			log_error( "Tarantool error: ".$error ) if $error;
-			$cb->([]);
-		}
-		else {
-			my $space = $self->dbh->master->{spaces}->{full_hashes};
-			my $ret = [];
-			foreach my $tup ( @{$result->{tuples}} ){
-				if( $tup->[$space->{fast}->{timestamp}->{no}] < $timestamp ){
-					$self->dbh->master->delete('full_hashes', [$tup->[0], $tup->[1], $tup->[2]], sub {
-						my ($result, $error) = @_;
-						log_error( "Tarantool error: ".$error ) if $error;
-					});
+	if ($self->dbh && $self->dbh->slave) {
+		$self->dbh->slave->select('full_hashes', [[$list,$chunknum]], {index => 1}, sub{
+			my ($result, $error) = @_;
+			if( $error || !$result->{count} ){
+				log_error( "Tarantool error: ".$error ) if $error;
+				$cb->([]);
+			}
+			else {
+				if ($self->dbh && $self->dbh->master) {
+					my $space = $self->dbh->master->{spaces}->{full_hashes};
+					my $ret = [];
+					foreach my $tup ( @{$result->{tuples}} ){
+						if( $tup->[$space->{fast}->{timestamp}->{no}] < $timestamp ){
+							if ($self->dbh && $self->dbh->master) {
+								$self->dbh->master->delete('full_hashes', [$tup->[0], $tup->[1], $tup->[2]], sub {
+									my ($result, $error) = @_;
+									log_error( "Tarantool error: ".$error ) if $error;
+								});
+							}
+							else { log_error( "Can't call delete method, SafeBrowsing2 tarantool master-server is unavailable" ) }
+						}
+						else {
+							push @$ret, {map {$_->{name} => $tup->[$_->{no}]||''} @{$space->{fields}}}
+						}
+					}
+					$cb->($ret); 
 				}
 				else {
-					push @$ret, {map {$_->{name} => $tup->[$_->{no}]||''} @{$space->{fields}}}
+					log_error( 'SafeBrowsing2 tarantool master-server is unavailable' );
+					$cb->([]);
 				}
 			}
-			$cb->($ret); 
-		}
-	});
+		});
+	}
+	else {
+		log_error( 'SafeBrowsing2 tarantool slave-server is unavailable' );
+		$cb->([]);
+	}
 	return;
 }
 
 sub add_chunks_s {
 	my ($self, $chunks, $cb) = @_;
 	ref $cb eq 'CODE' || die "cb arg is required and must be CODEREF";
-	$self->dbh->master->lua( 'safebrowsing.add_chunks_s', [$self->s_chunks_space(),JSON::XS->new->encode($chunks)], {in => 'pp', out => 'p'}, sub {
-		my ($result, $error) = @_;
-		log_error( "Tarantool error: ",$error ) if $error;
-		$cb->($error ? 1 : 0);
-	});
+	if ($self->dbh && $self->dbh->master) {
+		$self->dbh->master->lua( 'safebrowsing.add_chunks_s', [$self->s_chunks_space(),JSON::XS->new->encode($chunks)], {in => 'pp', out => 'p'}, sub {
+			my ($result, $error) = @_;
+			log_error( "Tarantool error: ",$error ) if $error;
+			$cb->($error ? 1 : 0);
+		});
+	}
+	else {
+		log_error( 'SafeBrowsing2 tarantool master-server is unavailable' );
+		$cb->(1);
+	}
 }
 
 sub add_chunks_a {
 	my ($self, $chunks, $cb) = @_;
 	ref $cb eq 'CODE' || die "cb arg is required and must be CODEREF";
-	$self->dbh->master->lua( 'safebrowsing.add_chunks_a', [$self->a_chunks_space(),JSON::XS->new->encode($chunks)], {in => 'pp', out => 'p'}, sub {
-		my ($result, $error) = @_;
-		log_error( "Tarantool error: ", $error ) if $error;
-		$cb->($error ? 1 : 0);
-	});
+	if ($self->dbh && $self->dbh->master) {
+		$self->dbh->master->lua( 'safebrowsing.add_chunks_a', [$self->a_chunks_space(),JSON::XS->new->encode($chunks)], {in => 'pp', out => 'p'}, sub {
+			my ($result, $error) = @_;
+			log_error( "Tarantool error: ", $error ) if $error;
+			$cb->($error ? 1 : 0);
+		});
+	}
+	else {
+		log_error( 'SafeBrowsing2 tarantool master-server is unavailable' );
+		$cb->(1);
+	}
 }
 
 sub add_full_hashes {
@@ -341,19 +411,21 @@ sub add_full_hashes {
 	my $timestamp     = $args{timestamp}                         || die "timestamp arg is required";
 	my $cb            = $args{'cb'};   ref $args{'cb'} eq 'CODE' || die "cb arg is required and must be CODEREF";
 
-	my $inserted = 0;
 	my $err = 0;
 	foreach my $fhash (@$full_hashes) {
-		$self->dbh->master->insert('full_hashes', [$fhash->{list}, $fhash->{chunknum}, $fhash->{hash}, $timestamp], sub {
-			my ($result, $error) = @_;
-			log_error( "Tarantool error: ".$error ) if $error;
-			$inserted++;
-			$err ||= $error;
-			if( $inserted == @$full_hashes ){
-				$cb->($err ? 1 : 0);
-			}
-		});
+		if ($self->dbh && $self->dbh->master) {
+			$self->dbh->master->insert('full_hashes', [$fhash->{list}, $fhash->{chunknum}, $fhash->{hash}, $timestamp], sub {
+				my ($result, $error) = @_;
+				log_error( "Tarantool error: ".$error ) if $error;
+				$err ||= $error;
+			});
+		}
+		else {
+			$err ||= 1;
+			log_error( "Can't call insert method: SafeBrowsing2 tarantool master-server is unavailable" );
+		}
 	}
+	$cb->($err ? 1 : 0);
 	return;
 }
 
